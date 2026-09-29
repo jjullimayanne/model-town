@@ -7,6 +7,7 @@ import type { CleaningDecisions } from '../ml/cleaning';
 import type { FeatureKey } from '../ml/dataset';
 import type { TrainRequest } from '../ml/engine/types';
 import { getDict, type Lang } from '../i18n';
+import { track } from '../analytics';
 
 export interface BridgeMissionState {
   step: BridgeStep;
@@ -114,18 +115,37 @@ export const useGame = create<GameState>()(
       toasts: [],
       discoveryQueue: [],
 
-      newGame: () =>
+      newGame: () => {
+        track('new-game');
         set({
           started: true, xp: 0, coins: 1200, day: 1, concepts: [], mission: freshMission(),
           bridgesRepaired: false, feedbackPrompted: false, openBuilding: null, discoveryQueue: [],
-        }),
-      continueGame: () => set({ started: true }),
+        });
+      },
+      continueGame: () => {
+        track(`continue/${get().mission.step}`);
+        set({ started: true });
+      },
       enter: (id) => set({ openBuilding: id }),
       toggleNotebook: (v) => set((s) => ({ showNotebook: v ?? !s.showNotebook })),
-      toggleHint: (v) => set((s) => ({ showHint: v ?? !s.showHint })),
-      toggleFeedback: (v) => set((s) => ({ showFeedback: v ?? !s.showFeedback, feedbackPrompted: true })),
-      setLang: (lang) => set({ lang }),
-      setTheme: (theme) => set({ theme }),
+      toggleHint: (v) => {
+        const open = v ?? !get().showHint;
+        if (open) track(`hint/${get().mission.step}`);
+        set({ showHint: open });
+      },
+      toggleFeedback: (v) => {
+        const open = v ?? !get().showFeedback;
+        if (open) track('feedback/open');
+        set({ showFeedback: open, feedbackPrompted: true });
+      },
+      setLang: (lang) => {
+        if (lang !== get().lang) track(`lang/${lang}`);
+        set({ lang });
+      },
+      setTheme: (theme) => {
+        if (theme !== get().theme) track(`theme/${theme}`);
+        set({ theme });
+      },
 
       gainXp: (amount, reason) => {
         if (amount <= 0) return;
@@ -165,6 +185,7 @@ export const useGame = create<GameState>()(
         const next = BRIDGE_MISSION.steps[stepIndex(step) + 1];
         if (!next) return;
         set((s) => ({ mission: { ...s.mission, step: next.id }, day: s.day + 1 }));
+        track(next.id === 'done' ? 'mission/bridges-complete' : `step/${step}`);
         get().gainXp(stepDef(step).xp, 'step');
       },
 

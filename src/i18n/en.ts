@@ -14,6 +14,7 @@ export const en: Dict = {
     controls: 'WASD / arrows to walk · click to move · E to enter buildings',
     savedLocally: 'Your progress is saved in this browser.',
     credits: 'Characters: Kenney (CC0) · Portraits: DiceBear “Adventurer” by Lisa Wischofsky (CC BY 4.0)',
+    privacy: 'Anonymous usage stats (no cookies), via GoatCounter.',
   },
 
   hud: {

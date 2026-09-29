@@ -1,8 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { initAnalytics } from './analytics';
 
 createRoot(document.getElementById('root')!).render(<App />);
+initAnalytics();
 
 if (import.meta.env.DEV) {
   // Debug handles for the browser console: __game.getState(), __bus.emit('building:enter', { id: 'mllab' })

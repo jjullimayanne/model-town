@@ -4,6 +4,7 @@ import { useGame } from '../../store/gameStore';
 import { Icon } from '../art/Icon';
 import { Logo } from '../art/Logo';
 import { Button } from '../common/Button';
+import { track } from '../../analytics';
 
 /** Where feedback goes. No backend yet: we open the player's mail app pre-filled (mailto). */
 export const FEEDBACK_EMAIL = 'jubsmayanne@gmail.com';
@@ -35,6 +36,7 @@ export function FeedbackBanner() {
 
   const send = () => {
     const url = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(f.subject)}&body=${encodeURIComponent(body)}`;
+    track(`feedback/send/${rating || 0}`);
     window.location.href = url;
     setStatus('sent');
   };

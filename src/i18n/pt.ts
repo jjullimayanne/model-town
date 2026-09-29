@@ -13,6 +13,7 @@ export const pt = {
     controls: 'WASD / setas para andar · clique para caminhar · E entra nos prédios',
     savedLocally: 'Seu progresso fica salvo neste navegador.',
     credits: 'Personagens: Kenney (CC0) · Retratos: DiceBear “Adventurer” por Lisa Wischofsky (CC BY 4.0)',
+    privacy: 'Estatísticas anônimas de uso (sem cookies), via GoatCounter.',
   },
 
   hud: {

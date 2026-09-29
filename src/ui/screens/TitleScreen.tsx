@@ -11,6 +11,7 @@ import { CAR_COLORS, SideCarShape } from '../art/Vehicles';
 import { Button } from '../common/Button';
 import { LangToggle } from '../hud/LangToggle';
 import { ThemeToggle } from '../hud/ThemeToggle';
+import { GOATCOUNTER_CODE } from '../../analytics';
 
 const SKY = {
   dark: 'linear-gradient(to bottom, #1f2338 0%, #2f3452 45%, #4f4a6b 75%, #9a7f8f 100%)',
@@ -156,7 +157,10 @@ export function TitleScreen() {
           <div className="mt-5 text-sm text-bark-soft flex items-center justify-center gap-2">
             <Icon name="keyboard" size={20} /> {t.title.controls}
           </div>
-          <div className="text-xs text-bark-soft/80 mt-1">{t.title.savedLocally}</div>
+          <div className="text-xs text-bark-soft/80 mt-1">
+            {t.title.savedLocally}
+            {GOATCOUNTER_CODE && <> {t.title.privacy}</>}
+          </div>
         </div>
       </div>
     </div>
