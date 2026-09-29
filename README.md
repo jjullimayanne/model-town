@@ -4,7 +4,7 @@
 
 Model Town é um jogo educativo isométrico, com clima lo-fi futurista, em que você resolve problemas reais dos moradores construindo modelos de IA. Não é um curso com quizzes: você aprende fazendo. Escolhe dados, limpa, treina, avalia, coloca em produção e vê as consequências.
 
-> **Jogar:** https://SEU-USUARIO.github.io/NOME-DO-REPO/ *(atualize depois do primeiro deploy)*
+> **Jogar:** https://jjullimayanne.github.io/model-town/
 
 ## A primeira missão: Pontes em Perigo
 
@@ -51,11 +51,11 @@ O repositório já vem com o workflow `.github/workflows/deploy.yml`, que faz o 
 1. Crie um repositório no GitHub (público, para o Pages gratuito).
 2. Conecte e envie:
    ```bash
-   git remote add origin https://github.com/SEU-USUARIO/NOME-DO-REPO.git
+   git remote add origin https://github.com/jjullimayanne/model-town.git
    git push -u origin main
    ```
 3. No GitHub, vá em **Settings → Pages → Build and deployment → Source** e escolha **GitHub Actions**.
-4. Acompanhe na aba **Actions**. Quando terminar, o jogo fica em `https://SEU-USUARIO.github.io/NOME-DO-REPO/`.
+4. Acompanhe na aba **Actions**. Quando terminar, o jogo fica em `https://jjullimayanne.github.io/model-town/`.
 
 O build usa caminhos relativos (`base: './'` no Vite), então funciona em qualquer nome de repositório sem configuração extra.
 
