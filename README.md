@@ -4,7 +4,9 @@
 
 Model Town é um jogo educativo isométrico, com clima lo-fi futurista, em que você resolve problemas reais dos moradores construindo modelos de IA. Não é um curso com quizzes: você aprende fazendo. Escolhe dados, limpa, treina, avalia, coloca em produção e vê as consequências.
 
-> **Jogar:** https://jjullimayanne.github.io/model-town/
+## [Jogar agora: jjullimayanne.github.io/model-town](https://jjullimayanne.github.io/model-town/)
+
+Gratuito, no navegador, em português e inglês. Sem cadastro.
 
 ## A primeira missão: Pontes em Perigo
 
@@ -87,6 +89,12 @@ src/
 **Backend Python no futuro:** implemente `POST /train`, recebendo o `TrainRequest` definido em `src/ml/engine/types.ts`, e rode com `VITE_ML_BACKEND_URL=https://sua-api`. A interface não muda.
 
 **Novas missões e mundos:** `src/content/worlds.ts` já descreve os 7 mundos (Fundamentos até MLOps). Cada missão é uma lista de etapas em `src/content/missions/`, com textos em `src/i18n/`.
+
+## Privacidade
+
+- O progresso fica salvo **só no seu navegador** (`localStorage`). Não há contas nem servidor.
+- O site conta visitas e etapas da missão de forma **anônima** com o [GoatCounter](https://www.goatcounter.com/): sem cookies, sem dados pessoais e respeitando o *Do Not Track*. Os eventos são apenas nomes como `step/clean_data`, usados para entender em que ponto as pessoas travam.
+- O formulário de feedback não envia nada sozinho: ele abre o seu app de e-mail já preenchido, e você decide se envia.
 
 ## Feedback
 
