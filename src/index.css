@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+@import '@fontsource/fredoka/400.css';
+@import '@fontsource/fredoka/600.css';
+@import '@fontsource/nunito/400.css';
+@import '@fontsource/nunito/700.css';
+@import '@fontsource/nunito/800.css';
+
+@theme {
+  --font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  /* Lo-fi futurist palette (dark = calm night). Token names are kept from the original theme. */
+  --color-bark: #e8e6f0;
+  --color-bark-soft: #a9aac4;
+  --color-cream: #3d4263;
+  --color-paper: #2f3452;
+  --color-white: #363b5b;
+  --color-leaf: #9cc5a1;
+  --color-leaf-dark: #b7dcbb;
+  --color-sun: #f2c46d;
+  --color-sun-dark: #e0ae4f;
+  --color-coral: #e8a87c;
+  --color-berry: #a99bd6;
+  --color-sky: #8fb8de;
+  --color-danger: #d98080;
+  --color-ink-dark: #23263a;
+}
+
+html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+/* Light theme: same token names, daytime palette. Dark (default) comes from @theme above. */
+:root { --app-bg: #23263a; --card-bg: rgba(47, 52, 82, 0.96); --card-border: rgba(143, 184, 222, 0.2); --wood-from: #363b5c; --wood-to: #3b3a5c; --wood-border: rgba(242, 196, 109, 0.35); --shadow: rgba(0, 0, 0, 0.32); color-scheme: dark; }
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bark: #2f3346;
+  --color-bark-soft: #6b7089;
+  --color-cream: #e9ecf4;
+  --color-paper: #ffffff;
+  --color-white: #ffffff;
+  --color-leaf: #6fae84;
+  --color-leaf-dark: #3f7d56;
+  --color-sun: #eab65a;
+  --color-sun-dark: #b98526;
+  --color-coral: #e0976a;
+  --color-berry: #7f73b8;
+  --color-sky: #4f89b8;
+  --color-danger: #c95a5a;
+  --app-bg: #eef0f5;
+  --card-bg: rgba(255, 255, 255, 0.96);
+  --card-border: rgba(79, 137, 184, 0.2);
+  --wood-from: #fbf7f0;
+  --wood-to: #f1eef8;
+  --wood-border: rgba(232, 176, 75, 0.4);
+  --shadow: rgba(47, 51, 70, 0.14);
+}
+body { font-family: var(--font-body); color: var(--color-bark); background: var(--app-bg); }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+.chunky { box-shadow: 0 4px 0 var(--shadow); }
+.chunky:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+.card { background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 22px; backdrop-filter: blur(6px); }
+.wood { background: linear-gradient(160deg, var(--wood-from), var(--wood-to)); border: 2px solid var(--wood-border); }
+.neon-text { text-shadow: 0 0 14px rgba(242, 196, 109, 0.25); }
+
+@keyframes pop-in { from { transform: scale(0.85) translateY(10px); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+@keyframes float-y { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+@keyframes slide-up { from { transform: translateY(20px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes wiggle { 0%,100% { transform: rotate(-3deg) } 50% { transform: rotate(3deg) } }
+@keyframes shine { 0% { transform: rotate(0) } 100% { transform: rotate(360deg) } }
+@keyframes drift { from { transform: translateX(-20vw) } to { transform: translateX(120vw) } }
+@keyframes car-right { from { transform: translateX(-10vw) } to { transform: translateX(110vw) } }
+@keyframes car-left-noflip { from { transform: translateX(110vw) } to { transform: translateX(-10vw) } }
+@keyframes car-left { from { transform: translateX(110vw) scaleX(-1) } to { transform: translateX(-10vw) scaleX(-1) } }
+.animate-pop { animation: pop-in .28s cubic-bezier(.2,1.4,.4,1) both; }
+.animate-float { animation: float-y 3s ease-in-out infinite; }
+.animate-slide { animation: slide-up .35s ease-out both; }
+.animate-wiggle { animation: wiggle 1.2s ease-in-out infinite; }
+.animate-shine { animation: shine 8s linear infinite; }
+
+.scroll-soft::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll-soft::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--color-berry) 45%, transparent); border-radius: 10px; border: 2px solid var(--color-paper); }
