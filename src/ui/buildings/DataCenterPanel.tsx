@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useT } from '../../i18n';
 import { NUMERIC_FEATURES, TARGET, getRawBridgeDataset, isOutlier, type FeatureKey, type NumericFeature } from '../../ml/dataset';
-import { useGame } from '../../store/gameStore';
+import { useGame, useSkill } from '../../store/gameStore';
 import { Icon } from '../art/Icon';
 import { Button } from '../common/Button';
 import { useChart } from '../common/chartTheme';
@@ -12,6 +12,20 @@ import { Speech } from '../common/Speech';
 
 const ALL_COLUMNS: ColumnKey[] = ['nome_da_ponte', ...NUMERIC_FEATURES, TARGET];
 const SELECTABLE: FeatureKey[] = ['nome_da_ponte', ...NUMERIC_FEATURES];
+
+/** Pearson correlation of each numeric column with the label, ignoring missing and impossible values. */
+function correlations(rows: ReturnType<typeof getRawBridgeDataset>): Record<NumericFeature, number> {
+  const out = {} as Record<NumericFeature, number>;
+  for (const f of NUMERIC_FEATURES) {
+    const pairs = rows.filter((r) => r[f] !== null && !isOutlier(f, r[f])).map((r) => [r[f] as number, r[TARGET]] as const);
+    const n = pairs.length;
+    const mx = pairs.reduce((s, p) => s + p[0], 0) / n, my = pairs.reduce((s, p) => s + p[1], 0) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (const [x, y] of pairs) { sxy += (x - mx) * (y - my); sxx += (x - mx) ** 2; syy += (y - my) ** 2; }
+    out[f] = sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0;
+  }
+  return out;
+}
 
 /** % of bridges needing maintenance per value bucket — lets the player *see* whether a column is a good clue. */
 function clueChart(col: NumericFeature) {
@@ -43,6 +57,8 @@ export function DataCenterPanel() {
   const [focus, setFocus] = useState<FeatureKey | null>(null);
   const [warnName, setWarnName] = useState(false);
   const selected = mission.features;
+  const reading = useSkill('data_reading');
+  const corr = useMemo(() => correlations(raw), [raw]);
 
   if (mission.step === 'talk_mayor') return <Speech who="datacenter">{t.notYet.datacenter}</Speech>;
 
@@ -98,6 +114,7 @@ export function DataCenterPanel() {
         <Speech who="datacenter" tone="good">{d.doneLine(selected.map((f) => colName(t, f)).join(', '))}</Speech>
       )}
       {feedback && <Speech who="datacenter" tone={feedback.tone}>{feedback.text}</Speech>}
+      {reading && <Speech who="datacenter">Curso de Leitura de dados ativo: o <b>r</b> em cada coluna é a correlação com o label (de −1 a +1). Quanto mais longe de 0, mais forte a pista.</Speech>}
 
       {!labelFound && !done && (
         <div className="card p-4 border-sun/60 animate-pop">
@@ -133,6 +150,11 @@ export function DataCenterPanel() {
                         )}
                         <Icon name={COLUMN_ICON[c]} size={18} /> {colName(t, c)}
                         {showTarget && <span className="text-[10px] bg-bark text-sun rounded px-1">LABEL</span>}
+                        {reading && c in corr && (
+                          <span title="Correlação com o label" className={`text-[10px] rounded px-1 font-mono ${Math.abs(corr[c as NumericFeature]) >= 0.25 ? 'bg-leaf/30' : 'bg-bark/10'}`}>
+                            r={corr[c as NumericFeature] >= 0 ? '+' : ''}{corr[c as NumericFeature].toFixed(2)}
+                          </span>
+                        )}
                       </button>
                     </th>
                   );

@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import type { BuildingId } from '../../content/buildings';
 import { useT } from '../../i18n';
 import { createRng } from '../../ml/rng';
-import { hasSave, useGame } from '../../store/gameStore';
+import { hasSave, progressSummary, useGame } from '../../store/gameStore';
 import { BuildingArt } from '../art/BuildingArt';
 import { Icon } from '../art/Icon';
 import { Logo } from '../art/Logo';
 import { NeonCharacter } from '../art/NeonCharacter';
 import { CAR_COLORS, SideCarShape } from '../art/Vehicles';
 import { Button } from '../common/Button';
+import { useTouch } from '../common/useTouch';
 import { LangToggle } from '../hud/LangToggle';
 import { ThemeToggle } from '../hud/ThemeToggle';
 import { GOATCOUNTER_CODE } from '../../analytics';
@@ -80,6 +81,7 @@ function Avenue({ theme }: { theme: 'light' | 'dark' }) {
 
 export function TitleScreen() {
   const t = useT();
+  const touch = useTouch();
   const { newGame, continueGame } = useGame();
   const theme = useGame((s) => s.theme);
   const save = hasSave();
@@ -97,7 +99,7 @@ export function TitleScreen() {
 
   return (
     <div className="h-full w-full relative overflow-hidden flex items-center justify-center" style={{ background: SKY[theme] }}>
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+      <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 z-20 flex items-center gap-2">
         <LangToggle />
         <ThemeToggle />
       </div>
@@ -129,25 +131,28 @@ export function TitleScreen() {
         {t.title.credits}
       </a>
 
-      <div className="relative z-10 text-center animate-pop -mt-24">
-        <div className="card chunky inline-block px-10 py-7">
-          <Logo size={84} className="mx-auto mb-2" />
-          <h1 className="font-display text-7xl font-semibold text-bark neon-text">Model Town</h1>
-          <p className="font-display text-2xl text-bark-soft mt-2">{t.title.subtitle}</p>
+      <div className="relative z-10 text-center animate-pop -mt-24 mx-4">
+        <div className="card chunky inline-block px-5 py-6 sm:px-10 sm:py-7">
+          <Logo size={72} className="mx-auto mb-2" />
+          <h1 className="font-display text-5xl sm:text-7xl font-semibold text-bark neon-text">Model Town</h1>
+          <p className="font-display text-xl sm:text-2xl text-bark-soft mt-2">{t.title.subtitle}</p>
           <p className="text-bark-soft mt-1">{t.title.tagline}</p>
 
           <div className="mt-7 flex flex-col items-center gap-3">
             {save && (
-              <Button size="lg" variant="leaf" onClick={continueGame} className="flex items-center gap-2">
-                <Icon name="play" size={22} /> {t.title.continue}
-              </Button>
+              <div className="flex flex-col items-center gap-1">
+                <Button size="lg" variant="leaf" onClick={continueGame} className="flex items-center gap-2">
+                  <Icon name="play" size={22} /> {t.title.continue}
+                </Button>
+                <span className="text-sm text-bark-soft max-w-xs">{progressSummary(useGame.getState(), t)}</span>
+              </div>
             )}
             {!confirmNew ? (
               <Button size="lg" variant={save ? 'ghost' : 'sun'} onClick={() => (save ? setConfirmNew(true) : newGame())} className="flex items-center gap-2">
                 <Icon name="seed" size={24} /> {t.title.newGame}
               </Button>
             ) : (
-              <div className="card px-4 py-3 flex items-center gap-3 animate-pop">
+              <div className="card px-4 py-3 flex flex-wrap items-center justify-center gap-3 animate-pop">
                 <span>{t.title.confirmErase}</span>
                 <Button size="sm" variant="danger" onClick={newGame}>{t.title.yesRestart}</Button>
                 <Button size="sm" variant="ghost" onClick={() => setConfirmNew(false)}>{t.title.cancel}</Button>
@@ -155,7 +160,7 @@ export function TitleScreen() {
             )}
           </div>
           <div className="mt-5 text-sm text-bark-soft flex items-center justify-center gap-2">
-            <Icon name="keyboard" size={20} /> {t.title.controls}
+            <Icon name={touch ? 'mouse' : 'keyboard'} size={20} /> {touch ? t.title.controlsTouch : t.title.controls}
           </div>
           <div className="text-xs text-bark-soft/80 mt-1">
             {t.title.savedLocally}

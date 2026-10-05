@@ -3,7 +3,9 @@ import { stepIndex } from '../../content/missions/bridgeMission';
 import { useT } from '../../i18n';
 import type { Prediction, TrainRequest } from '../../ml/engine';
 import { computeMetrics, pct } from '../../ml/metrics';
-import { useGame } from '../../store/gameStore';
+import { useGame, useSkill } from '../../store/gameStore';
+import { crossValidate, type FoldResult } from '../../ml/engine/localEngine';
+import { Bar } from '../common/Metric';
 import { Icon } from '../art/Icon';
 import { Button } from '../common/Button';
 import { CELL_STYLE, ConfusionMatrix, type Cell } from '../common/ConfusionMatrix';
@@ -29,6 +31,7 @@ export function EvaluationPanel() {
   const [reveal, setReveal] = useState(flags.ev_seen ? 1 : 0);
   const evaluating = step === 'evaluate';
   const past = stepIndex(step) > stepIndex('evaluate');
+  const crossVal = useSkill('cross_validation');
 
   useEffect(() => {
     if (!result || reveal >= 1) return;
@@ -152,6 +155,49 @@ export function EvaluationPanel() {
             )}
           </div>
         </div>
+      )}
+      {crossVal && phase === 'sandbox' && <CrossValidationCard req={mission.currentModel} single={base.accuracy} />}
+    </div>
+  );
+}
+
+/** Centro Técnico "Validação cruzada": 5 folds instead of one lucky (or unlucky) split. */
+function CrossValidationCard({ req, single }: { req: TrainRequest; single: number }) {
+  const [folds, setFolds] = useState<FoldResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const key = JSON.stringify(req);
+  useEffect(() => setFolds(null), [key]);
+  const run = () => {
+    setBusy(true);
+    setTimeout(() => { setFolds(crossValidate(req, 5)); setBusy(false); }, 30);
+  };
+  const mean = folds ? folds.reduce((a, f) => a + f.accuracy, 0) / folds.length : 0;
+  const std = folds ? Math.sqrt(folds.reduce((a, f) => a + (f.accuracy - mean) ** 2, 0) / folds.length) : 0;
+  const gap = single - mean;
+  return (
+    <div className="card p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="font-display text-lg font-semibold flex items-center gap-2 flex-1"><Icon name="split" size={26} /> Validação cruzada (5 folds)</div>
+        <Button variant="berry" disabled={busy} onClick={run}>{busy ? 'Treinando 5 modelos…' : folds ? 'Rodar de novo' : 'Rodar validação cruzada'}</Button>
+      </div>
+      {!folds && <div className="text-sm text-bark-soft">Os dados limpos são divididos em 5 partes. O modelo treina 5 vezes, cada vez testando numa parte que nunca viu.</div>}
+      {folds && (
+        <>
+          <div className="space-y-1.5">
+            {folds.map((f) => <Bar key={f.fold} label={`Fold ${f.fold}`} value={f.accuracy} color="#a99bd6" />)}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-berry/10 px-3 py-2"><b>Média: {pct(mean)}</b> ± {pct(std, 1)}<div className="text-xs text-bark-soft">accuracy nos 5 folds</div></div>
+            <div className="rounded-xl bg-cream px-3 py-2"><b>Teste único: {pct(single)}</b><div className="text-xs text-bark-soft">a divisão que você usou</div></div>
+          </div>
+          <Speech who="evaluation" tone={Math.abs(gap) > 0.03 ? 'warn' : 'good'}>
+            {Math.abs(gap) <= 0.03
+              ? 'O teste único bate com a média: dá para confiar nesse resultado.'
+              : gap > 0
+                ? `Seu teste único deu ${pct(gap)} acima da média. Foi uma divisão de sorte: o desempenho real é mais perto de ${pct(mean)}.`
+                : `Seu teste único deu ${pct(-gap)} abaixo da média. Foi uma divisão difícil: o modelo é um pouco melhor que parecia.`}
+          </Speech>
+        </>
       )}
     </div>
   );

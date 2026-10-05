@@ -15,6 +15,8 @@ export interface BusEvents {
   'fx:training': { on: boolean };
   'fx:deploy': void;
   'town:bridgesRepaired': { repaired: boolean; animate?: boolean };
+  /** Quest 2 shipped: villagers start praising the chatbot. */
+  'town:chatbotLive': { live: boolean };
   'lang:set': { lang: 'pt' | 'en' };
   'theme:set': { theme: 'light' | 'dark' };
 }

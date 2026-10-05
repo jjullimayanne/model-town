@@ -16,6 +16,8 @@ import { MLLabPanel } from './buildings/MLLabPanel';
 import { EvaluationPanel } from './buildings/EvaluationPanel';
 import { DeployPanel } from './buildings/DeployPanel';
 import { MonitoringPanel } from './buildings/MonitoringPanel';
+import { RagBuildingContent } from './phone/RagActivity';
+import { useRagStatus } from './phone/ragStatus';
 
 const CONTENT: Record<BuildingId, ComponentType> = {
   cityhall: CityHallPanel,
@@ -31,13 +33,14 @@ const CONTENT: Record<BuildingId, ComponentType> = {
 function NextStepCard({ here }: { here: BuildingId }) {
   const t = useT();
   const step = useGame((s) => s.mission.step);
-  if (step === 'done') return null;
+  const rag = useGame((s) => s.activeMission === 'rag');
+  if (rag || step === 'done') return null;
   const target = stepDef(step).building;
   if (target === here) return null;
   return (
     <div className="mb-4 rounded-2xl bg-white border border-bark/10 border-l-4 border-l-sun px-4 py-3 flex flex-wrap items-center gap-3 animate-pop">
       <BuildingArt id={target} size={52} />
-      <div className="flex-1 min-w-[200px]">
+      <div className="flex-1 min-w-[180px]">
         <div className="text-[11px] font-bold uppercase tracking-wider text-sun-dark">{t.common.nextStep}</div>
         <div className="text-sm text-bark-soft">{t.common.nothingHere}</div>
         <div className="font-display text-lg font-semibold leading-tight">{t.mission.steps[step]}</div>
@@ -52,6 +55,10 @@ export function BuildingPanel() {
   const id = useGame((s) => s.openBuilding);
   const enter = useGame((s) => s.enter);
   const toggleHint = useGame((s) => s.toggleHint);
+  const ragStatus = useRagStatus();
+  // Once quest 2 is fully wrapped up, buildings go back to their normal content (Lu keeps her dashboard).
+  const ragFinished = ragStatus.step === 'done' && ragStatus.done;
+  const rag = ragStatus.active && !(ragFinished && id !== 'monitoring');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && enter(null);
@@ -64,29 +71,28 @@ export function BuildingPanel() {
   const Content = CONTENT[id];
   const bt = t.buildings[id];
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-bark/25 backdrop-blur-[1.5px] p-4" onMouseDown={(e) => e.target === e.currentTarget && enter(null)}>
-      <div className="w-full max-w-6xl h-[90vh] card flex flex-col overflow-hidden animate-pop shadow-2xl" >
-        <div className="flex items-center gap-3 px-5 py-2.5 bg-paper border-b border-bark/10 relative">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-bark/25 backdrop-blur-[1.5px] sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && enter(null)}>
+      <div className="w-full max-w-6xl h-full sm:h-[90%] card rounded-none sm:rounded-[22px] border-0 sm:border-2 flex flex-col overflow-hidden animate-pop shadow-2xl">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-2 sm:py-2.5 bg-paper border-b border-bark/10 relative">
           <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: b.accent }} />
-          <BuildingArt id={id} size={44} />
-          <div className="flex-1">
-            <div className="font-display text-2xl font-semibold leading-none">{bt.name}</div>
-            <div className="text-sm text-bark-soft">{bt.tagline}</div>
+          <BuildingArt id={id} size={40} />
+          <div className="flex-1 min-w-0">
+            <div className="font-display text-xl sm:text-2xl font-semibold leading-none truncate">{bt.name}</div>
+            <div className="text-sm text-bark-soft truncate hidden sm:block">{bt.tagline}</div>
           </div>
           <div className="hidden md:flex items-center gap-2 bg-cream rounded-full pl-1 pr-3 py-1">
             <PersonCard who={id}><Portrait spec={PORTRAITS[id]} size={34} /></PersonCard>
             <span className="text-sm font-bold">{bt.host}</span>
           </div>
-          <button onClick={() => toggleHint()} className="flex items-center gap-1.5 bg-cream text-bark rounded-full px-3 py-1.5 font-display font-semibold hover:bg-white border border-bark/10" title={t.hud.hintTitle}>
-            <Icon name="bulb" size={20} /> {t.hud.hint}
+          <button onClick={() => toggleHint()} className="flex items-center gap-1.5 bg-cream text-bark rounded-full px-3 py-1.5 font-display font-semibold hover:bg-white border border-bark/10" title={t.hud.hintTitle} aria-label={t.hud.hint}>
+            <Icon name="bulb" size={20} /> <span className="hidden sm:inline">{t.hud.hint}</span>
           </button>
-          <button onClick={() => enter(null)} className="ml-1 w-10 h-10 rounded-full hover:bg-cream flex items-center justify-center" title={t.hud.exit}>
+          <button onClick={() => enter(null)} className="ml-1 w-11 h-11 shrink-0 rounded-full hover:bg-cream flex items-center justify-center" title={t.hud.exit} aria-label={t.hud.exit}>
             <Icon name="close" size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto scroll-soft p-5">
-          <NextStepCard here={id} />
-          <Content />
+        <div className="flex-1 overflow-y-auto overscroll-contain scroll-soft p-3 sm:p-5">
+          {rag ? <RagBuildingContent here={id} /> : <><NextStepCard here={id} /><Content /></>}
         </div>
       </div>
     </div>

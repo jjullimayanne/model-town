@@ -6,6 +6,7 @@ import { DecisionTree } from '../models/tree';
 import { RandomForest } from '../models/forest';
 import type { Classifier } from '../models/types';
 import { toMatrix, trainTestSplit } from '../preprocess';
+import { createRng, shuffle } from '../rng';
 import type { MLEngine, Prediction, TrainRequest, TrainResult } from './types';
 
 function makeModel(req: TrainRequest): Classifier {
@@ -30,6 +31,24 @@ function toPredictions(rows: BridgeRow[], proba: number[], features: FeatureKey[
 }
 
 export const requestKey = (req: TrainRequest) => JSON.stringify(req);
+
+export interface FoldResult { fold: number; accuracy: number; recall: number }
+
+/** k-fold cross-validation (Centro Técnico skill): every row is tested exactly once, by a model that never saw it. */
+export function crossValidate(req: TrainRequest, k = 5): FoldResult[] {
+  const { rows } = cleanDataset(getRawBridgeDataset(), req.cleaning);
+  const shuffled = shuffle(rows, createRng(req.seed));
+  return Array.from({ length: k }, (_, f) => {
+    const test = shuffled.filter((_, i) => i % k === f);
+    const train = shuffled.filter((_, i) => i % k !== f);
+    const tr = toMatrix(train, req.features);
+    const te = toMatrix(test, req.features);
+    const model = makeModel(req);
+    model.fit(tr.X, tr.y);
+    const m = computeMetrics(model.predictProba(te.X), te.y);
+    return { fold: f + 1, accuracy: m.accuracy, recall: m.recall };
+  });
+}
 
 /** Runs the whole pipeline in the browser. Deterministic: same request → same model. */
 export class LocalEngine implements MLEngine {

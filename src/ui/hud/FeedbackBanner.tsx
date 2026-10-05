@@ -52,7 +52,7 @@ export function FeedbackBanner() {
   const shown = hover || rating;
   return (
     <div className="absolute inset-0 z-[75] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="card w-full max-w-lg p-6 animate-pop max-h-[92vh] overflow-y-auto scroll-soft">
+      <div className="card w-full max-w-lg p-6 animate-pop max-h-[92%] overflow-y-auto overscroll-contain scroll-soft">
         <div className="flex items-start gap-4">
           <Logo size={64} />
           <div className="flex-1">

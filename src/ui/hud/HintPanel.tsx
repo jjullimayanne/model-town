@@ -3,11 +3,13 @@ import { EventBus } from '../../bridge/EventBus';
 import { getHint } from '../../content/hints';
 import { CONCEPT_ICON } from '../../content/concepts';
 import { useT } from '../../i18n';
-import { useGame } from '../../store/gameStore';
+import { useGame, useSkill } from '../../store/gameStore';
 import { Icon } from '../art/Icon';
 import { Owl } from '../art/BuildingArt';
 import { Button } from '../common/Button';
 import { goTo } from '../common/nav';
+import { RAG_HINTS } from '../../content/missions/ragMission';
+import { useRagStatus } from '../phone/ragStatus';
 
 /** Tuca the owl: explains the AI idea behind the current moment and how to move on. */
 export function HintPanel() {
@@ -18,19 +20,24 @@ export function HintPanel() {
   const open = useGame((s) => s.openBuilding);
   const [revealed, setRevealed] = useState(false);
   const [fromBridge, setFromBridge] = useState(false);
-  const hint = getHint(mission, t);
-  const hintKey = `${mission.step}-${hint.title}`;
+  const ragStep = useGame((s) => (s.activeMission === 'rag' ? s.rag.step : null));
+  const openPhone = useGame((s) => s.togglePhone);
+  const ragTarget = useRagStatus().target;
+  const hint = ragStep ? { ...RAG_HINTS[ragStep], building: 'cityhall' as const } : getHint(mission, t);
+  const hintKey = `${ragStep ?? mission.step}-${hint.title}`;
 
-  useEffect(() => setRevealed(false), [hintKey]);
+  // Centro Técnico "Coruja sábia": the direct hint is already open.
+  const wise = useSkill('wise_owl');
+  useEffect(() => setRevealed(wise), [hintKey, wise]);
   useEffect(() => EventBus.on('bridge:click', () => { setFromBridge(true); useGame.getState().toggleHint(true); }), []);
   useEffect(() => { if (!show) setFromBridge(false); }, [show]);
 
   if (!show) return null;
   const concept = hint.concept;
   return (
-    <div className="absolute right-4 top-24 z-[65] w-[400px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-7rem)] overflow-y-auto scroll-soft card chunky p-5 animate-pop border-sky/60">
+    <div className="absolute left-2 right-2 top-16 md:left-auto md:right-4 md:top-24 z-[65] md:w-[400px] max-h-[calc(100%-5rem)] md:max-h-[calc(100%-7rem)] overflow-y-auto overscroll-contain scroll-soft card chunky p-4 md:p-5 animate-pop border-sky/60">
       <div className="flex items-start gap-3">
-        <Owl size={64} className="animate-float" />
+        <Owl size={56} className="animate-float shrink-0" />
         <div className="flex-1">
           <div className="text-[11px] font-bold uppercase tracking-wider text-bark-soft">{t.hud.hint} · {t.hints.guide}</div>
           <div className="font-display text-xl font-semibold leading-tight">{hint.title}</div>
@@ -40,7 +47,7 @@ export function HintPanel() {
             </span>
           )}
         </div>
-        <button onClick={() => toggle(false)} className="w-8 h-8 rounded-full hover:bg-cream flex items-center justify-center" title={t.common.close}>
+        <button onClick={() => toggle(false)} className="w-10 h-10 -mr-1 -mt-1 shrink-0 rounded-full hover:bg-cream flex items-center justify-center" title={t.common.close} aria-label={t.common.close}>
           <Icon name="close" size={16} />
         </button>
       </div>
@@ -81,7 +88,16 @@ export function HintPanel() {
         )}
       </div>
 
-      {open !== hint.building && (
+      {ragStep && ragStep !== 'done' && (ragTarget ? (
+        <Button className="w-full mt-3" variant="sun" onClick={() => { toggle(false); goTo(ragTarget); }}>
+          {t.common.takeMeThere}: {t.buildings[ragTarget].name} →
+        </Button>
+      ) : (
+        <Button className="w-full mt-3" variant="sun" onClick={() => { toggle(false); openPhone(true); }}>
+          Abrir o celular →
+        </Button>
+      ))}
+      {!ragStep && open !== hint.building && (
         <Button className="w-full mt-3" variant="sun" onClick={() => { toggle(false); goTo(hint.building); }}>
           {t.common.takeMeThere}: {t.buildings[hint.building].name} →
         </Button>

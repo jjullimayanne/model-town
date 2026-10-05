@@ -512,6 +512,13 @@ const ICONS = {
       <rect x="6" y="25" width="36" height="6" rx="3" fill={C.sunDark} />
     </>
   ),
+  phone: (
+    <>
+      <rect x="14" y="5" width="20" height="38" rx="4" fill={C.sky} />
+      <rect x="17" y="10" width="14" height="24" rx="1.5" fill={C.skyLight} />
+      <path d="M21 38.5 h6" />
+    </>
+  ),
   news: (
     <>
       <path d="M8 8 h32 v32 H8Z" fill={C.paper} />

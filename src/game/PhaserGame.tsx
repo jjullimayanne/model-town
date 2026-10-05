@@ -16,6 +16,8 @@ export function PhaserGame() {
       render: { antialias: true, roundPixels: false },
       scene: [TownScene],
     });
+    // Debug handle for the browser console, like __game/__bus in main.tsx: __phaser.scene.getScene('Town')
+    if (import.meta.env.DEV) Object.assign(window, { __phaser: game });
     return () => game.destroy(true);
   }, []);
 

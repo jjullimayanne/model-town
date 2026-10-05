@@ -25,7 +25,11 @@
   --color-ink-dark: #23263a;
 }
 
-html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+html, body, #root { height: 100%; height: 100dvh; margin: 0; overflow: hidden; }
+/* Phones: no pull-to-refresh, no double-tap zoom, no grey tap flash, no text selection while dragging the map. */
+html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+button, a, [role='button'] { touch-action: manipulation; }
+canvas { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* Light theme: same token names, daytime palette. Dark (default) comes from @theme above. */
 :root { --app-bg: #23263a; --card-bg: rgba(47, 52, 82, 0.96); --card-border: rgba(143, 184, 222, 0.2); --wood-from: #363b5c; --wood-to: #3b3a5c; --wood-border: rgba(242, 196, 109, 0.35); --shadow: rgba(0, 0, 0, 0.32); color-scheme: dark; }
 :root[data-theme='light'] {
@@ -55,10 +59,16 @@ body { font-family: var(--font-body); color: var(--color-bark); background: var(
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
-.chunky { box-shadow: 0 4px 0 var(--shadow); }
-.chunky:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
-.card { background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 22px; backdrop-filter: blur(6px); }
-.wood { background: linear-gradient(160deg, var(--wood-from), var(--wood-to)); border: 2px solid var(--wood-border); }
+/* In the components layer so utilities (bg-sun, hover:bg-cream, rounded-none…) can override them. */
+@layer components {
+  .chunky { box-shadow: 0 4px 0 var(--shadow); }
+  .chunky:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+  .card { background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 22px; backdrop-filter: blur(6px); }
+  .wood { background: linear-gradient(160deg, var(--wood-from), var(--wood-to)); border: 2px solid var(--wood-border); }
+}
+/* HUD layer: keeps overlays clear of the notch / home indicator; lets map touches through the gaps. */
+.hud-safe { position: absolute; top: env(safe-area-inset-top); right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); left: env(safe-area-inset-left); pointer-events: none; }
+@layer base { .hud-safe > * { pointer-events: auto; } }
 .neon-text { text-shadow: 0 0 14px rgba(242, 196, 109, 0.25); }
 
 @keyframes pop-in { from { transform: scale(0.85) translateY(10px); opacity: 0 } to { transform: scale(1); opacity: 1 } }

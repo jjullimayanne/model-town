@@ -11,6 +11,10 @@ import { buildingTextureOrigin, generateAllTextures, houseOrigins, loadCharacter
 import { Walker } from '../objects/Walker';
 
 const PLAYER_SPEED_PX = 150;
+/** Finger travel (screen px) beyond which a touch counts as a drag, not a tap. */
+const DRAG_THRESHOLD = 10;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 1.8;
 /** Screen y just above a building's roof (tallest toppers need more room). */
 const labelY = (id: BuildingId, centerY: number) => centerY - TOWER_H[id] - (id === 'monitoring' ? 82 : id === 'cityhall' ? 72 : 58);
 const BUBBLES = ['bub_heart', 'bub_note', 'bub_cup', 'bub_flower', 'bub_bridge'];
@@ -19,10 +23,14 @@ const VILLAGERS: { sheet: CharacterSheet; glow: number }[] = [
   { sheet: 'femalePerson', glow: NEON.yellow }, { sheet: 'malePerson', glow: NEON.green }, { sheet: 'maleAdventurer', glow: NEON.pink },
 ];
 
+type Bubble = Phaser.GameObjects.Image | Phaser.GameObjects.Container;
+interface Villager { w: Walker; wait: number; bubble?: Bubble }
+
 export class TownScene extends Phaser.Scene {
   private map!: TownMap;
   private player!: Walker;
-  private villagers: { w: Walker; wait: number; bubble?: Phaser.GameObjects.Image }[] = [];
+  private villagers: Villager[] = [];
+  private chatbotLive = false;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private locked = false;
   private near: BuildingId | null = null;
@@ -39,6 +47,10 @@ export class TownScene extends Phaser.Scene {
   private cracks: Phaser.GameObjects.GameObject[] = [];
   private trainingFx?: Phaser.GameObjects.Particles.ParticleEmitter;
   private unsubs: (() => void)[] = [];
+  /** Set once the current gesture has moved too far to be a tap (pan or pinch). */
+  private dragged = false;
+  private pinchDist = 0;
+  private following = true;
 
   constructor() {
     super('Town');
@@ -69,7 +81,7 @@ export class TownScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(-N * 32 - 200, -300, N * 64 + 400, N * 32 + 600);
     cam.startFollow(this.player.sprite, true, 0.09, 0.09);
-    cam.setZoom(this.scale.width < 900 ? 0.85 : 1.15);
+    cam.setZoom(this.scale.width < 500 ? 0.75 : this.scale.width < 900 ? 0.85 : 1.15);
 
     this.setupInput();
     this.setupBus();
@@ -101,12 +113,9 @@ export class TownScene extends Phaser.Scene {
       const img = this.add.image(top.x - o.ox, top.y - o.oy, `bld_${b.id}`).setOrigin(0, 0);
       img.setDepth(gridToScreen(b.tile.x + b.tile.w / 2, b.tile.y + b.tile.h / 2).y);
       img.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 10 });
-      img.on('pointerover', () => img.setTint(0xfff4d6));
+      img.on('pointerover', (p: Phaser.Input.Pointer) => !p.wasTouch && img.setTint(0xfff4d6));
       img.on('pointerout', () => img.clearTint());
-      img.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
-        ev.stopPropagation();
-        if (!this.locked) this.walkToBuilding(b.id);
-      });
+      this.onTap(img, () => this.walkToBuilding(b.id));
       this.buildingImgs.set(b.id, img);
 
       const labelPos = gridToScreen(b.tile.x + b.tile.w / 2, b.tile.y + b.tile.h / 2);
@@ -118,6 +127,8 @@ export class TownScene extends Phaser.Scene {
         .setOrigin(0.5, 1)
         .setDepth(20000)
         .setResolution(2);
+      label.setInteractive({ useHandCursor: true });
+      this.onTap(label, () => this.walkToBuilding(b.id));
       this.labels.set(b.id, label);
     }
     for (const [i, h] of this.map.houses.entries()) {
@@ -151,20 +162,14 @@ export class TownScene extends Phaser.Scene {
       const p = gridToScreen(t.x, t.y);
       const crack = this.add.image(p.x - TILE_W / 2, p.y, 'crack').setOrigin(0, 0).setDepth(-8990);
       crack.setInteractive({ useHandCursor: true, pixelPerfect: false });
-      crack.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
-        ev.stopPropagation();
-        EventBus.emit('bridge:click');
-      });
+      this.onTap(crack, () => EventBus.emit('bridge:click'));
       this.cracks.push(crack);
     }
     const mid = middle[Math.floor(middle.length / 2)] ?? { x: 12, y: 14 };
     const p = gridToScreen(mid.x + 0.5, mid.y - 0.3);
     const sign = this.add.image(p.x, p.y - 8, 'warn_sign').setOrigin(0.5, 1).setDepth(p.y + 10);
     sign.setInteractive({ useHandCursor: true });
-    sign.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
-      ev.stopPropagation();
-      EventBus.emit('bridge:click');
-    });
+    this.onTap(sign, () => EventBus.emit('bridge:click'));
     this.tweens.add({ targets: sign, y: sign.y - 6, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.cracks.push(sign);
   }
@@ -287,7 +292,7 @@ export class TownScene extends Phaser.Scene {
 
   private updateVillagers(dt: number) {
     for (const v of this.villagers) {
-      if (v.bubble) v.bubble.setPosition(v.w.sprite.x, v.w.sprite.y - 50).setDepth(v.w.sprite.depth + 1);
+      v.bubble?.setPosition(v.w.sprite.x, v.w.sprite.y - 50);
       if (v.w.followPath(dt, 1.3)) continue;
       v.w.animate(dt, false);
       v.wait -= dt;
@@ -298,18 +303,48 @@ export class TownScene extends Phaser.Scene {
       if (this.map.ground[tx][ty] === 'path' || this.map.ground[tx][ty] === 'plaza') {
         v.w.path = findPath(this.map, { x: Math.floor(v.w.gx), y: Math.floor(v.w.gy) }, { x: tx, y: ty })?.slice(1) ?? [];
       }
-      if (!v.bubble && Math.random() < 0.35) this.sayVillager(v);
+      if (!v.bubble && Math.random() < (this.chatbotLive ? 0.6 : 0.35)) this.sayVillager(v);
     }
   }
 
-  private sayVillager(v: { w: Walker; bubble?: Phaser.GameObjects.Image }) {
+  private sayVillager(v: Villager) {
+    if (this.chatbotLive && Math.random() < 0.75) return this.sayText(v);
     const key = BUBBLES[Math.floor(Math.random() * BUBBLES.length)];
-    v.bubble = this.add.image(v.w.sprite.x, v.w.sprite.y - 50, key).setOrigin(0.5, 1);
-    this.tweens.add({ targets: v.bubble, scale: { from: 0.4, to: 1 }, duration: 220, ease: 'Back.out' });
-    this.time.delayedCall(2200, () => {
-      v.bubble?.destroy();
+    this.showBubble(v, this.add.image(v.w.sprite.x, v.w.sprite.y - 50, key).setOrigin(0.5, 1), 2200);
+  }
+
+  /** A speech balloon with a line praising the town chatbot (after quest 2 ships). */
+  private sayText(v: Villager) {
+    const lines = currentDict().town.chatbotPraise;
+    const text = this.add.text(0, 0, lines[Math.floor(Math.random() * lines.length)], {
+      fontFamily: 'Nunito, sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#2f3346',
+      wordWrap: { width: 150 }, align: 'center',
+    }).setOrigin(0.5, 1).setResolution(2);
+    const w = text.width + 18, h = text.height + 12;
+    const g = this.add.graphics();
+    g.fillStyle(0xffffff, 0.96).fillRoundedRect(-w / 2, -h - 8, w, h, 10);
+    g.fillTriangle(-6, -8.5, 6, -8.5, 0, 0);
+    g.lineStyle(2, NEON.cyan, 0.9).strokeRoundedRect(-w / 2, -h - 8, w, h, 10);
+    text.setPosition(0, -14);
+    this.showBubble(v, this.add.container(v.w.sprite.x, v.w.sprite.y - 50, [g, text]), 3600);
+  }
+
+  private showBubble(v: Villager, bubble: Bubble, ms: number) {
+    v.bubble?.destroy();
+    v.bubble = bubble.setDepth(25000);
+    this.tweens.add({ targets: bubble, scale: { from: 0.4, to: 1 }, duration: 220, ease: 'Back.out' });
+    this.time.delayedCall(ms, () => {
+      if (v.bubble !== bubble) return;
+      bubble.destroy();
       v.bubble = undefined;
     });
+  }
+
+  private setChatbotLive(live: boolean) {
+    if (live === this.chatbotLive) return;
+    this.chatbotLive = live;
+    // Everyone has something to say the moment it ships.
+    if (live) this.villagers.forEach((v, i) => this.time.delayedCall(400 + i * 350, () => this.sayText(v)));
   }
 
   // ───────────────────────── input & movement
@@ -323,23 +358,99 @@ export class TownScene extends Phaser.Scene {
     this.keys.SPACE.on('down', tryEnter);
     this.keys.ENTER.on('down', tryEnter);
 
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (this.locked) return;
+    // Touch & mouse: a short press is a tap (walk), a drag pans the camera, two fingers pinch-zoom.
+    this.input.addPointer(1);
+    this.input.on('pointerdown', () => {
+      if (this.activePointers().length === 1) this.dragged = false;
+      this.pinchDist = 0;
+    });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (!p.isDown || this.locked) return;
+      const active = this.activePointers();
+      if (active.length >= 2) {
+        this.dragged = true;
+        const [a, b] = active;
+        const d = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+        if (this.pinchDist) this.setZoom(this.cameras.main.zoom * (d / this.pinchDist));
+        this.pinchDist = d;
+        return;
+      }
+      if (!this.dragged && Phaser.Math.Distance.Between(p.downX, p.downY, p.x, p.y) < DRAG_THRESHOLD) return;
+      this.dragged = true;
+      const cam = this.cameras.main;
+      if (this.following) {
+        cam.stopFollow();
+        this.following = false;
+      }
+      cam.scrollX -= (p.x - p.prevPosition.x) / cam.zoom;
+      cam.scrollY -= (p.y - p.prevPosition.y) / cam.zoom;
+    });
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (this.locked || this.dragged || this.activePointers().length) return;
       const g = screenToGrid(p.worldX, p.worldY);
-      const tx = Math.floor(g.x), ty = Math.floor(g.y);
-      if (!isWalkable(this.map, tx, ty)) return;
+      const t = this.nearestWalkable(Math.floor(g.x), Math.floor(g.y));
+      if (!t) return;
       this.pendingEnter = null;
-      this.walkTo(tx, ty);
+      this.walkTo(t.x, t.y);
     });
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
-      const cam = this.cameras.main;
-      cam.setZoom(Phaser.Math.Clamp(cam.zoom - dy * 0.001, 0.6, 1.8));
+      this.setZoom(this.cameras.main.zoom - dy * 0.001);
     });
+  }
+
+  private activePointers() {
+    return this.input.manager.pointers.filter((p) => p.isDown);
+  }
+
+  private setZoom(z: number) {
+    this.cameras.main.setZoom(Phaser.Math.Clamp(z, ZOOM_MIN, ZOOM_MAX));
+  }
+
+  /** Runs `fn` when the object is tapped/clicked (released without dragging). */
+  private onTap(obj: Phaser.GameObjects.GameObject, fn: () => void) {
+    obj.on('pointerup', (_p: Phaser.Input.Pointer, _x: number, _y: number, ev: Phaser.Types.Input.EventData) => {
+      if (this.dragged) return;
+      ev.stopPropagation();
+      if (!this.locked) fn();
+    });
+  }
+
+  /** Fingers are imprecise: a tap on a wall, tree or the highway goes to the closest walkable tile. */
+  private nearestWalkable(tx: number, ty: number): { x: number; y: number } | null {
+    for (let r = 0; r <= 2; r++) {
+      let best: { x: number; y: number } | null = null;
+      let bestD = Infinity;
+      for (let dx = -r; dx <= r; dx++)
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || !isWalkable(this.map, tx + dx, ty + dy)) continue;
+          const d = Math.hypot(dx, dy);
+          if (d < bestD) { bestD = d; best = { x: tx + dx, y: ty + dy }; }
+        }
+      if (best) return best;
+    }
+    return null;
+  }
+
+  /** Brings the camera back to the player after the map was panned by hand. */
+  private refollow() {
+    if (this.following) return;
+    this.following = true;
+    this.cameras.main.startFollow(this.player.sprite, true, 0.09, 0.09);
+  }
+
+  private showTapMarker(tx: number, ty: number) {
+    const p = gridToScreen(tx, ty);
+    const m = this.add.image(p.x - TILE_W / 2, p.y, 'ring').setOrigin(0, 0).setDepth(-8980);
+    this.tweens.add({ targets: m, alpha: { from: 1, to: 0 }, duration: 700, ease: 'Quad.out', onComplete: () => m.destroy() });
   }
 
   private walkTo(tx: number, ty: number) {
     const path = findPath(this.map, { x: Math.floor(this.player.gx), y: Math.floor(this.player.gy) }, { x: tx, y: ty });
     this.player.path = path ? path.slice(1) : [];
+    if (path) {
+      this.showTapMarker(tx, ty);
+      this.refollow();
+    }
   }
 
   private walkToBuilding(id: BuildingId) {
@@ -363,6 +474,7 @@ export class TownScene extends Phaser.Scene {
     }
     const p = this.player;
     if (sx || sy) {
+      this.refollow();
       p.path = [];
       this.pendingEnter = null;
       const len = Math.hypot(sx, sy);
@@ -412,6 +524,7 @@ export class TownScene extends Phaser.Scene {
       EventBus.on('objective:set', ({ id }) => this.setObjective(id)),
       EventBus.on('town:bridgesRepaired', ({ repaired, animate }) => this.setBridgesRepaired(repaired, animate)),
       EventBus.on('fx:celebrate', () => this.celebrate()),
+      EventBus.on('town:chatbotLive', ({ live }) => this.setChatbotLive(live)),
       EventBus.on('fx:training', ({ on }) => this.setTraining(on)),
       EventBus.on('fx:deploy', () => this.deployFx()),
       EventBus.on('theme:set', ({ theme }) => this.applyTheme(theme)),

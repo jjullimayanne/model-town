@@ -7,7 +7,7 @@ import { generatePython, parsePython } from '../../ml/codegen';
 import { NUMERIC_FEATURES, getRawBridgeDataset, type FeatureKey } from '../../ml/dataset';
 import { engine, type Algorithm, type ModelParams, type TrainRequest, type TrainResult } from '../../ml/engine';
 import { pct } from '../../ml/metrics';
-import { useGame } from '../../store/gameStore';
+import { useGame, useSkill } from '../../store/gameStore';
 import { Button } from '../common/Button';
 import { ALGO_ICON, COLUMN_ICON, colName } from '../common/labels';
 import { Icon } from '../art/Icon';
@@ -26,6 +26,33 @@ const DEFAULT_PARAMS: Record<Algorithm, ModelParams> = {
 };
 
 type ConsoleLine = { text: string; kind?: 'err' | 'ok' | 'dim' };
+
+/** Centro Técnico "Intuição de hiperparâmetros": a rule-of-thumb read of the knobs, before training. */
+function riskOf(algorithm: Algorithm, p: ModelParams): { level: 'ok' | 'over' | 'under'; text: string } {
+  const d = p.max_depth ?? 4;
+  if (algorithm === 'decision_tree') {
+    if (d >= 10) return { level: 'over', text: `Profundidade ${d}: a árvore vai decorar o treino. Risco alto de overfitting.` };
+    if (d <= 2) return { level: 'under', text: `Profundidade ${d}: perguntas demais de menos. Risco de underfitting.` };
+    return { level: 'ok', text: `Profundidade ${d}: bom equilíbrio entre aprender e generalizar.` };
+  }
+  if (algorithm === 'random_forest') {
+    if (d <= 2) return { level: 'under', text: `Árvores com profundidade ${d} são simples demais, mesmo em floresta. Risco de underfitting.` };
+    if ((p.n_estimators ?? 100) <= 10) return { level: 'over', text: 'Só 10 árvores: a votação fica instável e o resultado varia muito.' };
+    if (d >= 13) return { level: 'over', text: `Profundidade ${d}: a floresta compensa um pouco, mas ainda tende a decorar. Risco médio.` };
+    return { level: 'ok', text: 'Muitas árvores de profundidade moderada: o ponto forte da Random Forest.' };
+  }
+  const C = p.C ?? 1;
+  if (C >= 10) return { level: 'over', text: `C = ${C}: pouca regularização, o modelo pode se ajustar demais. Risco leve de overfitting.` };
+  if (C <= 0.01) return { level: 'under', text: `C = ${C}: regularização forte demais, os pesos ficam pequenos. Risco de underfitting.` };
+  return { level: 'ok', text: `C = ${C}: regularização equilibrada.` };
+}
+
+/** Centro Técnico "Python avançado": ready-made starting points for the Python mode. */
+const SNIPPETS: { label: string; algorithm: Algorithm; params: ModelParams }[] = [
+  { label: 'Floresta com 200 árvores', algorithm: 'random_forest', params: { n_estimators: 200, max_depth: 8 } },
+  { label: 'Árvore rasa (profundidade 3)', algorithm: 'decision_tree', params: { max_depth: 3 } },
+  { label: 'Logística regularizada (C=0.1)', algorithm: 'logistic_regression', params: { C: 0.1 } },
+];
 
 export function MLLabPanel() {
   const { SERIES } = useChart();
@@ -54,6 +81,8 @@ export function MLLabPanel() {
   const [result, setResult] = useState<TrainResult | null>(null);
   const [ottoLine, setOttoLine] = useState<string | null>(null);
   const timer = useRef<number>();
+  const intuition = useSkill('hyper_intuition');
+  const pythonPro = useSkill('python_pro');
 
   const cleaning = mission.cleaning as CleaningDecisions;
   const rowCount = useMemo(() => (cleaning.missing ? cleanDataset(getRawBridgeDataset(), cleaning).report.after : 0), [cleaning]);
@@ -222,6 +251,16 @@ export function MLLabPanel() {
                     <div className="flex items-center justify-center gap-1" style={{ width: `${testSize * 100}%`, background: SERIES.test }}>{ml.testBar(nTest)}</div>
                   </div>
                 </div>
+                {intuition && (() => {
+                  const r = riskOf(algorithm, p);
+                  const tone = r.level === 'ok' ? 'bg-leaf/15 border-leaf/50' : r.level === 'over' ? 'bg-coral/15 border-coral/60' : 'bg-sky/15 border-sky/50';
+                  return (
+                    <div className={`rounded-xl border-2 px-3 py-2 text-sm ${tone}`}>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-bark-soft flex items-center gap-1"><Icon name="sliders" size={14} /> Intuição de hiperparâmetros</div>
+                      <div className="font-semibold">{r.level === 'ok' ? '✓ ' : '⚠ '}{r.text}</div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -231,6 +270,26 @@ export function MLLabPanel() {
               <span className="text-bark-soft flex-1">{ml.codeHelp}</span>
               {codeDirty && <button className="text-xs underline flex items-center gap-1" onClick={() => setCodeDirty(false)}><Icon name="refresh" size={14} /> {ml.restore}</button>}
             </div>
+            {pythonPro && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-bark-soft flex items-center gap-1"><Icon name="code" size={14} /> Trechos prontos</span>
+                {SNIPPETS.map((sn) => (
+                  <button
+                    key={sn.label}
+                    className="text-xs chunky rounded-lg bg-white hover:bg-cream px-2 py-1 font-bold"
+                    onClick={() => {
+                      const params = { ...DEFAULT_PARAMS[sn.algorithm], ...sn.params };
+                      setAlgorithm(sn.algorithm);
+                      setParams((all) => ({ ...all, [sn.algorithm]: params }));
+                      setCode(generatePython({ cleaning, features: mission.features, algorithm: sn.algorithm, params, testSize, seed: SEED }, t));
+                      setCodeDirty(true);
+                    }}
+                  >
+                    {sn.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <PythonEditor value={code} onChange={(v) => { setCode(v); setCodeDirty(true); }} />
             <Console lines={consoleLines} />
           </div>

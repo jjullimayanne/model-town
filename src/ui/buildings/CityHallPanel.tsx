@@ -50,12 +50,7 @@ export function CityHallPanel() {
       <div className="space-y-4">
         <MissionPoster />
         {step === 'done' ? (
-          <>
-            <Speech who="cityhall" tone="good">{t.cityhall.done(bridgesRepaired)}</Speech>
-            <Button variant="sun" onClick={() => useGame.getState().toggleFeedback(true)} className="flex items-center gap-2">
-              <Icon name="newspaper" size={20} /> {t.feedback.open}
-            </Button>
-          </>
+          <Speech who="cityhall" tone="good">{t.cityhall.done(bridgesRepaired)}</Speech>
         ) : (
           <>
             <Speech who="cityhall">{t.cityhall.status[step]}</Speech>

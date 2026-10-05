@@ -2,8 +2,8 @@ import { useMemo, type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { useT } from '../../i18n';
 import { cleanDataset, type CleaningDecisions } from '../../ml/cleaning';
-import { detectIssues, getRawBridgeDataset, type BridgeRow } from '../../ml/dataset';
-import { useGame } from '../../store/gameStore';
+import { detectIssues, getRawBridgeDataset, isOutlier, PLAUSIBLE, type BridgeRow } from '../../ml/dataset';
+import { useGame, useSkill } from '../../store/gameStore';
 import { Icon, type IconName } from '../art/Icon';
 import { Button } from '../common/Button';
 import { useChart } from '../common/chartTheme';
@@ -42,6 +42,7 @@ export function CleaningLabPanel() {
   const c = mission.cleaning;
   const before = ['talk_mayor', 'explore_data'].includes(mission.step);
   const done = !before && mission.step !== 'clean_data';
+  const detective = useSkill('outlier_detective');
 
   const preview = useMemo(
     () => cleanDataset(raw, { missing: c.missing ?? 'median', duplicates: c.duplicates ?? 'keep', outliers: c.outliers ?? 'keep' }),
@@ -72,7 +73,7 @@ export function CleaningLabPanel() {
 
   const scatter = useMemo(() => {
     const rows = cleanDataset(raw, { missing: 'median', duplicates: 'drop', outliers: c.outliers ?? 'keep' }).rows;
-    return rows.map((r) => ({ idade: r.idade_da_ponte ?? 0, trafego: r.trafego_diario ?? 0 }));
+    return rows.map((r) => ({ idade: r.idade_da_ponte ?? 0, trafego: r.trafego_diario ?? 0, sus: isOutlier('idade_da_ponte', r.idade_da_ponte) || isOutlier('trafego_diario', r.trafego_diario) }));
   }, [raw, c.outliers]);
 
   if (before) return <NotYet who="cleaning" text={t.notYet.cleaning} />;
@@ -139,10 +140,19 @@ export function CleaningLabPanel() {
                 <XAxis type="number" dataKey="idade" tick={{ fontSize: 10, fill: INK.axis }} name={cl.age} />
                 <YAxis type="number" dataKey="trafego" tick={{ fontSize: 9, fill: INK.axis }} name={cl.traffic} tickFormatter={(v) => (v >= 1e6 ? `${v / 1e6}M` : `${Math.round(v / 1000)}k`)} />
                 <Tooltip {...tooltipStyle} />
-                <Scatter data={scatter} fill={MAG} fillOpacity={0.6} shape="circle" isAnimationActive={false} />
+                <Scatter data={detective ? scatter.filter((p) => !p.sus) : scatter} fill={MAG} fillOpacity={0.6} shape="circle" isAnimationActive={false} />
+                {detective && <Scatter data={scatter.filter((p) => p.sus)} fill={SERIES.test} shape="diamond" isAnimationActive={false} />}
               </ScatterChart>
             </ResponsiveContainer>
           </div>
+          {detective && (
+            <div className="rounded-lg bg-coral/10 px-2 py-1.5 text-[11px] leading-snug space-y-0.5">
+              <div className="font-bold flex items-center gap-1"><Icon name="magnifier" size={14} /> Detetive de outliers: {scatter.filter((p) => p.sus).length} suspeitos no gráfico (◆)</div>
+              {issues.outliers.map((o) => (
+                <div key={o.column}>{colName(t, o.column)}: {o.count} fora do plausível ({fmt(PLAUSIBLE[o.column][0])}–{fmt(PLAUSIBLE[o.column][1])}), ex.: {fmt(o.example)}</div>
+              ))}
+            </div>
+          )}
         </Station>
       </div>
 

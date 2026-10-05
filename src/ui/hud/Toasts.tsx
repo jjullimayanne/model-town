@@ -11,8 +11,10 @@ const STYLE: Record<string, { cls: string; icon: IconName }> = {
 
 export function Toasts() {
   const toasts = useGame((s) => s.toasts);
+  // On wide screens the phone sits on the right: keep toasts beside it, not on top of its buttons.
+  const phone = useGame((s) => s.showPhone);
   return (
-    <div className="absolute bottom-24 right-4 flex flex-col items-end gap-2 z-[80] pointer-events-none">
+    <div className={`absolute bottom-36 right-2 md:bottom-24 ${phone ? 'sm:right-[436px]' : 'md:right-4'} flex flex-col items-end gap-2 z-[80] pointer-events-none`}>
       {toasts.map((t) => (
         <div key={t.id} className={`chunky rounded-2xl px-4 py-2 font-display font-semibold animate-slide flex items-center gap-2 ${STYLE[t.kind].cls}`}>
           <Icon name={STYLE[t.kind].icon} size={20} /> {t.text}

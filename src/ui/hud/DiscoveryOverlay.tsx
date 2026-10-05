@@ -19,10 +19,10 @@ export function DiscoveryOverlay() {
   const c = t.concepts[id];
   const big = id === 'overfitting' || id === 'recall';
   return (
-    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-bark/30 backdrop-blur-[2px]" onClick={dismiss}>
+    <div className="absolute inset-0 z-[85] flex items-center justify-center bg-bark/30 backdrop-blur-[2px] p-4" onClick={dismiss}>
       <div className="relative animate-pop" key={id} onClick={(e) => e.stopPropagation()}>
         <div className="absolute inset-0 -m-16 rounded-full bg-[conic-gradient(from_0deg,#ffd23f55,transparent_20%,#ffd23f55_40%,transparent_60%,#ffd23f55_80%,transparent)] animate-shine" />
-        <div className="relative card w-[420px] p-7 text-center border-sun border-4">
+        <div className="relative card w-[min(420px,calc(100vw-2rem))] p-5 sm:p-7 text-center border-sun border-4">
           <div className="text-xs font-bold tracking-[0.25em] text-sun-dark flex items-center justify-center gap-2">
             <Icon name="sparkle" size={16} /> {big ? t.discovery.big : t.discovery.found} <Icon name="sparkle" size={16} />
           </div>
